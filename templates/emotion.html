@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Emotion Detection</title>
+
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            color: #222;
+        }
+        /* ==============================
+           NAVBAR
+        ============================== */
+        
+        .navbar {
+            background: #1f2937;
+            color: white;
+            padding: 18px 35px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .navbar h2 {
+            margin: 0;
+        }
+        
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+        }
+        /* ==============================
+           CONTAINER
+        ============================== */
+        
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 30px auto;
+        }
+        
+        .title {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .title h1 {
+            margin-bottom: 8px;
+        }
+        
+        .boxes {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+        
+        .box {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.10);
+        }
+        
+        .box h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        /* ==============================
+           CAMERA
+        ============================== */
+        
+        video {
+            width: 100%;
+            height: 430px;
+            background: black;
+            border-radius: 12px;
+            object-fit: cover;
+        }
+        
+        canvas {
+            display: none;
+        }
+        /* ==============================
+           BUTTONS
+        ============================== */
+        
+        button {
+            border: none;
+            padding: 14px 22px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+            margin-right: 8px;
+        }
+        
+        .start {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .stop {
+            background: #dc2626;
+            color: white;
+        }
+        
+        .detect {
+            background: #16a34a;
+            color: white;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+        }
+        /* ==============================
+           STATUS
+        ============================== */
+        
+        .status {
+            margin-top: 15px;
+            padding: 13px;
+            border-radius: 8px;
+            background: #f3f4f6;
+            font-size: 16px;
+        }
+        /* ==============================
+           RESULT
+        ============================== */
+        
+        .result {
+            margin-top: 20px;
+            padding: 25px;
+            background: #eef2ff;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .emotion {
+            font-size: 34px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .confidence {
+            font-size: 20px;
+        }
+        /* ==============================
+           ERROR
+        ============================== */
+        
+        .error {
+            margin-top: 15px;
+            padding: 15px;
+            background: #fee2e2;
+            color: #991b1b;
+            border-radius: 8px;
+            word-break: break-word;
+        }
+        /* ==============================
+           UPLOAD
+        ============================== */
+        
+        input[type="file"] {
+            width: 100%;
+            margin: 15px 0;
+            font-size: 15px;
+        }
+        
+        .uploaded-image {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            margin-top: 20px;
+            border-radius: 10px;
+        }
+        /* ==============================
+           MOBILE
+        ============================== */
+        
+        @media (max-width: 850px) {
+            .boxes {
+                grid-template-columns: 1fr;
+            }
+            video {
+                height: 350px;
+            }
+        }
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <!-- ======================================================
+     NAVBAR
+======================================================= -->
+
+    <div class="navbar">
+
+        <h2>
+            Facial Emotion Recognition
+        </h2>
+
+        <div>
+
+            <a href="/dashboard">
+            Dashboard
+        </a>
+
+            <a href="/logout">
+            Logout
+        </a>
+
+        </div>
+
+    </div>
+
+
+    <!-- ======================================================
+     MAIN
+======================================================= -->
+
+    <div class="container">
+
+
+        <div class="title">
+
+            <h1>
+                Emotion Detection
+            </h1>
+
+            <p>
+                Detect facial emotions using your camera or upload an image.
+            </p>
+
+        </div>
+
+
+        <div class="boxes">
+
+
+            <!-- =================================================
+             LIVE CAMERA
+        ================================================== -->
+
+            <div class="box">
+
+                <h2>
+                    📷 Live Camera
+                </h2>
+
+
+                <video id="video" autoplay playsinline>
+            </video>
+
+
+                <canvas id="canvas">
+            </canvas>
+
+
+                <button class="start" onclick="startCamera()">
+
+                Start Camera
+
+            </button>
+
+
+                <button class="stop" onclick="stopCamera()">
+
+                Stop Camera
+
+            </button>
+
+
+                <button class="detect" onclick="detectEmotion()">
+
+                Detect Emotion
+
+            </button>
+
+
+                <div class="status" id="cameraStatus">
+
+                    Camera is not started.
+
+                </div>
+
+
+                <div class="result">
+
+                    <div class="emotion" id="cameraEmotion">
+
+                        --
+
+                    </div>
+
+
+                    <div class="confidence" id="cameraConfidence">
+
+                        Confidence: --
+
+                    </div>
+
+                </div>
+
+
+                <div class="error" id="cameraError" style="display:none;">
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+             IMAGE UPLOAD
+        ================================================== -->
+
+            <div class="box">
+
+                <h2>
+                    🖼 Upload Image
+                </h2>
+
+
+                <form action="/upload" method="POST" enctype="multipart/form-data">
+
+
+                    <input type="file" name="image" accept=".jpg,.jpeg,.png" required>
+
+
+                    <br>
+
+
+                    <button type="submit" class="detect">
+
+                    Detect Emotion
+
+                </button>
+
+                </form>
+
+
+                {% if error %}
+
+                <div class="error">
+
+                    {{ error }}
+
+                </div>
+
+                {% endif %} {% if image %}
+
+                <img class="uploaded-image" src="{{ url_for('uploaded_file', filename=image) }}"> {% endif %} {% if emotion %}
+
+                <div class="result">
+
+                    <h3>
+                        Detected Emotion
+                    </h3>
+
+
+                    <div class="emotion">
+
+                        {{ emotion }}
+
+                    </div>
+
+
+                    <div class="confidence">
+
+                        Confidence: {{ confidence }}%
+
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <script>
+        // ======================================================
+        // VARIABLES
+        // ======================================================
+
+        let video =
+            document.getElementById("video");
+
+        let canvas =
+            document.getElementById("canvas");
+
+        let cameraStatus =
+            document.getElementById("cameraStatus");
+
+        let cameraEmotion =
+            document.getElementById("cameraEmotion");
+
+        let cameraConfidence =
+            document.getElementById("cameraConfidence");
+
+        let cameraError =
+            document.getElementById("cameraError");
+
+        let stream = null;
+
+
+        // ======================================================
+        // START CAMERA
+        // ======================================================
+
+        async function startCamera() {
+
+            try {
+
+                cameraStatus.innerText =
+                    "Starting camera...";
+
+                cameraError.style.display =
+                    "none";
+
+
+                stream =
+                    await navigator.mediaDevices.getUserMedia({
+
+                        video: {
+
+                            width: 640,
+
+                            height: 480
+
+                        },
+
+                        audio: false
+
+                    });
+
+
+                video.srcObject =
+                    stream;
+
+
+                cameraStatus.innerText =
+                    "Camera is running. Click Detect Emotion.";
+
+
+            } catch (error) {
+
+                console.error(
+                    "Camera error:",
+                    error
+                );
+
+
+                cameraStatus.innerText =
+                    "Camera error: " +
+                    error.message;
+
+            }
+
+        }
+
+
+        // ======================================================
+        // STOP CAMERA
+        // ======================================================
+
+        function stopCamera() {
+
+            if (stream) {
+
+                let tracks =
+                    stream.getTracks();
+
+
+                tracks.forEach(
+                    function(track) {
+
+                        track.stop();
+
+                    }
+                );
+
+
+                stream = null;
+
+                video.srcObject = null;
+
+            }
+
+
+            cameraStatus.innerText =
+                "Camera stopped.";
+
+        }
+
+
+        // ======================================================
+        // DETECT EMOTION
+        // ======================================================
+
+        async function detectEmotion() {
+
+
+            // --------------------------------------------------
+            // Check camera
+            // --------------------------------------------------
+
+            if (!stream) {
+
+                cameraStatus.innerText =
+                    "Please start the camera first.";
+
+                return;
+
+            }
+
+
+            // --------------------------------------------------
+            // Clear previous error
+            // --------------------------------------------------
+
+            cameraError.style.display =
+                "none";
+
+            cameraError.innerText = "";
+
+
+            cameraStatus.innerText =
+                "Capturing camera frame...";
+
+
+            // --------------------------------------------------
+            // Check video dimensions
+            // --------------------------------------------------
+
+            if (
+                video.videoWidth === 0 ||
+                video.videoHeight === 0
+            ) {
+
+                cameraStatus.innerText =
+                    "Camera is not ready. Please wait.";
+
+                return;
+
+            }
+
+
+            // --------------------------------------------------
+            // Set canvas size
+            // --------------------------------------------------
+
+            canvas.width =
+                video.videoWidth;
+
+            canvas.height =
+                video.videoHeight;
+
+
+            // --------------------------------------------------
+            // Draw camera frame
+            // --------------------------------------------------
+
+            let context =
+                canvas.getContext("2d");
+
+
+            context.drawImage(
+
+                video,
+
+                0,
+
+                0,
+
+                canvas.width,
+
+                canvas.height
+
+            );
+
+
+            cameraStatus.innerText =
+                "Preparing image...";
+
+
+            // --------------------------------------------------
+            // Convert image to JPEG
+            // --------------------------------------------------
+
+            canvas.toBlob(
+
+                async function(blob) {
+
+
+                    if (!blob) {
+
+                        cameraStatus.innerText =
+                            "Could not capture image.";
+
+                        return;
+
+                    }
+
+
+                    // ------------------------------------------------
+                    // Create form data
+                    // ------------------------------------------------
+
+                    let formData =
+                        new FormData();
+
+
+                    formData.append(
+
+                        "frame",
+
+                        blob,
+
+                        "camera.jpg"
+
+                    );
+
+
+                    cameraStatus.innerText =
+                        "Analyzing emotion...";
+
+
+                    // ------------------------------------------------
+                    // Send to Flask
+                    // ------------------------------------------------
+
+                    try {
+
+                        let response =
+                            await fetch(
+
+                                "/camera_detect",
+
+                                {
+
+                                    method: "POST",
+
+                                    body: formData
+
+                                }
+
+                            );
+
+
+                        // --------------------------------------------
+                        // Read response
+                        // --------------------------------------------
+
+                        let data;
+
+
+                        try {
+
+                            data =
+                                await response.json();
+
+                        } catch (jsonError) {
+
+                            data = {
+
+                                error: "Server returned an invalid response."
+
+                            };
+
+                        }
+
+
+                        console.log(
+                            "HTTP status:",
+                            response.status
+                        );
+
+
+                        console.log(
+                            "Server response:",
+                            data
+                        );
+
+
+                        // ============================================
+                        // SUCCESS
+                        // ============================================
+
+                        if (
+                            response.ok &&
+                            data.success &&
+                            data.emotion
+                        ) {
+
+
+                            cameraEmotion.innerText =
+                                data.emotion;
+
+
+                            cameraConfidence.innerText =
+                                "Confidence: " +
+                                data.confidence +
+                                "%";
+
+
+                            cameraStatus.innerText =
+                                "Emotion detected successfully.";
+
+
+                            cameraError.style.display =
+                                "none";
+
+
+                        }
+
+
+                        // ============================================
+                        // ERROR FROM PYTHON
+                        // ============================================
+                        else {
+
+
+                            cameraEmotion.innerText =
+                                "--";
+
+
+                            cameraConfidence.innerText =
+                                "Confidence: --";
+
+
+                            let errorMessage =
+                                data.error ||
+                                "Unknown detection error.";
+
+
+                            cameraStatus.innerText =
+                                "Detection failed.";
+
+
+                            cameraError.innerText =
+                                "Python error: " +
+                                errorMessage;
+
+
+                            cameraError.style.display =
+                                "block";
+
+
+                            console.error(
+                                "Python error:",
+                                errorMessage
+                            );
+
+                        }
+
+
+                    } catch (error) {
+
+
+                        console.error(
+                            "Fetch error:",
+                            error
+                        );
+
+
+                        cameraStatus.innerText =
+                            "Could not connect to Flask.";
+
+
+                        cameraError.innerText =
+                            "Connection error: " +
+                            error.message;
+
+
+                        cameraError.style.display =
+                            "block";
+
+                    }
+
+                },
+
+
+                "image/jpeg",
+
+                0.85
+
+            );
+
+        }
+    </script>
+
+
+</body>
+
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Login - Facial Emotion Recognition</title>
+
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient( 135deg, #141e30, #243b55);
+        }
+        
+        .login-container {
+            width: 400px;
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+        
+        .icon {
+            font-size: 60px;
+            margin-bottom: 15px;
+        }
+        
+        h1 {
+            color: #222;
+            font-size: 26px;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #777;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .input-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        input {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+        
+        input:focus {
+            border-color: #243b55;
+        }
+        
+        .login-button {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            background: #243b55;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .login-button:hover {
+            background: #141e30;
+        }
+        
+        .error {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 10px;
+            border-radius: 7px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .demo {
+            margin-top: 25px;
+            color: #777;
+            font-size: 13px;
+        }
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <div class="login-container">
+
+
+        <div class="icon">
+            😊
+        </div>
+
+
+        <h1>
+            Facial Emotion Recognition
+        </h1>
+
+
+        <p class="subtitle">
+            Deep Learning Based Emotion Detection
+        </p>
+
+
+        {% if error %}
+
+        <div class="error">
+
+            {{ error }}
+
+        </div>
+
+        {% endif %}
+
+
+        <form action="/login" method="POST">
+
+
+            <div class="input-group">
+
+                <label for="username">
+                    Username
+                </label>
+
+                <input type="text" id="username" name="username" placeholder="Enter username" required>
+
+            </div>
+
+
+            <div class="input-group">
+
+                <label for="password">
+                    Password
+                </label>
+
+                <input type="password" id="password" name="password" placeholder="Enter password" required>
+
+            </div>
+
+
+            <button type="submit" class="login-button">
+
+                LOGIN
+
+            </button>
+
+
+        </form>
+
+
+        <p class="demo">
+
+            Demo Login:
+            <b>admin / 1234</b>
+
+        </p>
+
+
+    </div>
+
+
+</body>
+
+</html>
