@@ -1,7 +1,9 @@
 import tensorflow as tf
+from pathlib import Path
 from tensorflow.keras import layers, models
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
+PROJECT_DIR = Path(__file__).resolve().parents[1]
 IMG_SIZE = 48
 BATCH_SIZE = 32
 
@@ -10,8 +12,9 @@ EPOCHS = 8
 STEPS_PER_EPOCH = 200
 VALIDATION_STEPS = 50
 
-TRAIN_DIR = "dataset/train"
-TEST_DIR = "dataset/test"
+TRAIN_DIR = PROJECT_DIR / "dataset" / "train"
+TEST_DIR = PROJECT_DIR / "dataset" / "test"
+MODEL_PATH = PROJECT_DIR / "model" / "emotion_model.keras"
 
 # ==========================================
 # DATA AUGMENTATION
@@ -153,9 +156,7 @@ history = model.fit(
 # SAVE MODEL
 # ==========================================
 
-model.save(
-    "model/emotion_model.keras"
-)
+model.save(MODEL_PATH)
 
 print("\n======================================")
 print("TRAINING COMPLETED")
