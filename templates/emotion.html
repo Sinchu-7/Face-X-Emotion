@@ -1,819 +1,332 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-
-    <meta charset="UTF-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Emotion Detection</title>
-
-
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Analyze | Face-X-Emotion</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
-        
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f3f4f6;
-            color: #222;
-        }
-        /* ==============================
-           NAVBAR
-        ============================== */
-        
-        .navbar {
-            background: #1f2937;
-            color: white;
-            padding: 18px 35px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .navbar h2 {
-            margin: 0;
-        }
-        
-        .navbar a {
-            color: white;
-            text-decoration: none;
-            margin-left: 20px;
-        }
-        /* ==============================
-           CONTAINER
-        ============================== */
-        
-        .container {
-            width: 90%;
-            max-width: 1200px;
-            margin: 30px auto;
-        }
-        
-        .title {
-            text-align: center;
-            margin-bottom: 25px;
-        }
-        
-        .title h1 {
-            margin-bottom: 8px;
-        }
-        
-        .boxes {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 25px;
-        }
-        
-        .box {
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.10);
-        }
-        
-        .box h2 {
-            margin-top: 0;
-            margin-bottom: 20px;
-        }
-        /* ==============================
-           CAMERA
-        ============================== */
-        
-        video {
-            width: 100%;
-            height: 430px;
-            background: black;
-            border-radius: 12px;
-            object-fit: cover;
-        }
-        
-        canvas {
-            display: none;
-        }
-        /* ==============================
-           BUTTONS
-        ============================== */
-        
-        button {
-            border: none;
-            padding: 14px 22px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 15px;
-            margin-right: 8px;
-        }
-        
-        .start {
-            background: #2563eb;
-            color: white;
-        }
-        
-        .stop {
-            background: #dc2626;
-            color: white;
-        }
-        
-        .detect {
-            background: #16a34a;
-            color: white;
-        }
-        
-        button:hover {
-            opacity: 0.9;
-        }
-        /* ==============================
-           STATUS
-        ============================== */
-        
-        .status {
-            margin-top: 15px;
-            padding: 13px;
-            border-radius: 8px;
-            background: #f3f4f6;
-            font-size: 16px;
-        }
-        /* ==============================
-           RESULT
-        ============================== */
-        
-        .result {
-            margin-top: 20px;
-            padding: 25px;
-            background: #eef2ff;
-            border-radius: 12px;
-            text-align: center;
-        }
-        
-        .emotion {
-            font-size: 34px;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        
-        .confidence {
-            font-size: 20px;
-        }
-        /* ==============================
-           ERROR
-        ============================== */
-        
-        .error {
-            margin-top: 15px;
-            padding: 15px;
-            background: #fee2e2;
-            color: #991b1b;
-            border-radius: 8px;
-            word-break: break-word;
-        }
-        /* ==============================
-           UPLOAD
-        ============================== */
-        
-        input[type="file"] {
-            width: 100%;
-            margin: 15px 0;
-            font-size: 15px;
-        }
-        
-        .uploaded-image {
-            width: 100%;
-            max-height: 400px;
-            object-fit: contain;
-            margin-top: 20px;
-            border-radius: 10px;
-        }
-        /* ==============================
-           MOBILE
-        ============================== */
-        
-        @media (max-width: 850px) {
-            .boxes {
-                grid-template-columns: 1fr;
-            }
-            video {
-                height: 350px;
-            }
-        }
+        :root { font-family: Inter, "Segoe UI", Arial, sans-serif; color: #172033; background: #f3f6fb; }
+        * { box-sizing: border-box; }
+        body { min-height: 100vh; margin: 0; }
+        header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 14px max(20px, calc((100% - 1180px) / 2)); background: #fff; border-bottom: 1px solid #e8ecf3; }
+        .brand { display: flex; align-items: center; gap: 10px; color: #3859d7; font-weight: 750; text-decoration: none; }
+        .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; background: #eef1ff; font-size: 19px; }
+        .header-actions { display: flex; align-items: center; gap: 12px; }
+        .nav-link, .logout { border: 0; padding: 10px 14px; border-radius: 9px; background: #f1f3f8; color: #344054; text-decoration: none; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+        main { width: min(100% - 36px, 1180px); margin: 38px auto 60px; }
+        .intro { margin-bottom: 26px; }
+        .eyebrow { color: #536fe0; font-size: 12px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+        h1 { margin: 8px 0; font-size: clamp(30px, 5vw, 40px); letter-spacing: -.045em; }
+        .intro p { margin: 0; color: #667085; line-height: 1.6; }
+        .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+        .panel { min-width: 0; padding: 22px; border: 1px solid #e4e9f2; border-radius: 17px; background: #fff; box-shadow: 0 12px 35px #26395b0c; }
+        h2 { margin: 0 0 16px; font-size: 19px; }
+        video, .preview-image { display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 12px; background: #101725; object-fit: contain; }
+        video:not([src]) { color: white; }
+        .preview-wrap { margin-top: 14px; }
+        .preview-wrap[hidden], .results[hidden] { display: none; }
+        .controls { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+        button, .file-label { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border: 0; border-radius: 9px; background: #3859d7; color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+        button:hover, .file-label:hover { background: #2e49ba; }
+        button.secondary { background: #eef1ff; color: #3859d7; }
+        button.secondary:hover { background: #e2e7ff; }
+        button:disabled { opacity: .58; cursor: wait; }
+        .file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+        .file-input:focus-visible + .file-label { outline: 3px solid #93a4ff; outline-offset: 2px; }
+        .status { min-height: 22px; margin: 13px 0 0; color: #667085; font-size: 13px; }
+        .error { margin-top: 10px; padding: 11px 13px; border-radius: 9px; background: #fff0ef; color: #a52c25; font-size: 13px; line-height: 1.5; }
+        .error[hidden] { display: none; }
+        .results { margin-top: 18px; padding-top: 17px; border-top: 1px solid #e8ecf3; }
+        .result-heading { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+        .result-heading strong { color: #1b2c57; font-size: 22px; text-transform: capitalize; }
+        .result-heading span, .face-heading { color: #667085; font-size: 13px; }
+        .face-card { margin-top: 13px; padding: 13px; border: 1px solid #edf0f6; border-radius: 11px; }
+        .face-heading { display: flex; justify-content: space-between; margin-bottom: 11px; font-weight: 650; }
+        .score-row { display: grid; grid-template-columns: 78px 1fr 48px; align-items: center; gap: 8px; margin: 8px 0; font-size: 12px; text-transform: capitalize; }
+        .score-track { height: 7px; overflow: hidden; border-radius: 8px; background: #edf0f7; }
+        .score-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #7189f4, #3859d7); }
+        .score-value { color: #667085; text-align: right; }
+        .spinner { width: 15px; height: 15px; border: 2px solid #ffffff70; border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .disclaimer { margin: 24px 2px 0; color: #7a8497; font-size: 12px; line-height: 1.6; }
+        @media (max-width: 760px) { .panels { grid-template-columns: 1fr; } main { margin-top: 28px; } }
+        @media (max-width: 480px) { header { padding: 12px 14px; } .header-actions { gap: 6px; } .nav-link, .logout { padding: 9px; font-size: 12px; } main { width: min(100% - 24px, 1180px); } .panel { padding: 16px; } .controls button, .file-label { flex: 1; } }
     </style>
-
 </head>
-
-
 <body>
-
-
-    <!-- ======================================================
-     NAVBAR
-======================================================= -->
-
-    <div class="navbar">
-
-        <h2>
-            Facial Emotion Recognition
-        </h2>
-
-        <div>
-
-            <a href="/dashboard">
-            Dashboard
-        </a>
-
-            <a href="/logout">
-            Logout
-        </a>
-
+    <header>
+        <a class="brand" href="{{ url_for('dashboard') }}"><span class="brand-mark" aria-hidden="true">☺</span> Face-X-Emotion</a>
+        <div class="header-actions">
+            <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+            <form action="{{ url_for('logout') }}" method="post"><button class="logout" type="submit">Sign out</button></form>
         </div>
-
-    </div>
-
-
-    <!-- ======================================================
-     MAIN
-======================================================= -->
-
-    <div class="container">
-
-
-        <div class="title">
-
-            <h1>
-                Emotion Detection
-            </h1>
-
-            <p>
-                Detect facial emotions using your camera or upload an image.
-            </p>
-
-        </div>
-
-
-        <div class="boxes">
-
-
-            <!-- =================================================
-             LIVE CAMERA
-        ================================================== -->
-
-            <div class="box">
-
-                <h2>
-                    📷 Live Camera
-                </h2>
-
-
-                <video id="video" autoplay playsinline>
-            </video>
-
-
-                <canvas id="canvas">
-            </canvas>
-
-
-                <button class="start" onclick="startCamera()">
-
-                Start Camera
-
-            </button>
-
-
-                <button class="stop" onclick="stopCamera()">
-
-                Stop Camera
-
-            </button>
-
-
-                <button class="detect" onclick="detectEmotion()">
-
-                Detect Emotion
-
-            </button>
-
-
-                <div class="status" id="cameraStatus">
-
-                    Camera is not started.
-
+    </header>
+    <main>
+        <section class="intro">
+            <div class="eyebrow">Analysis</div>
+            <h1>Choose an image source</h1>
+            <p>Analyze a camera snapshot or a local JPEG/PNG. Images are processed in memory and are not saved by this app.</p>
+        </section>
+        <section class="panels">
+            <article class="panel" id="camera-panel">
+                <h2>Camera snapshot</h2>
+                <video id="video" autoplay playsinline muted aria-label="Camera preview"></video>
+                <canvas id="canvas" hidden></canvas>
+                <div class="controls">
+                    <button id="start-camera" type="button">Start camera</button>
+                    <button id="stop-camera" class="secondary" type="button" disabled>Stop camera</button>
+                    <button id="detect-camera" type="button" disabled>Detect expression</button>
                 </div>
-
-
-                <div class="result">
-
-                    <div class="emotion" id="cameraEmotion">
-
-                        --
-
+                <p class="status" id="camera-status" role="status" aria-live="polite">Camera is stopped.</p>
+                <div class="error" id="camera-error" role="alert" hidden></div>
+                <section class="results" id="camera-results" aria-live="polite" hidden>
+                    <div class="result-heading"><strong id="camera-emotion"></strong><span id="camera-confidence"></span></div>
+                    <div id="camera-faces"></div>
+                </section>
+            </article>
+            <article class="panel" id="upload-panel">
+                <h2>Upload an image</h2>
+                <form id="upload-form">
+                    <input class="file-input" id="image-file" name="image" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+                    <label class="file-label" for="image-file">Choose JPG or PNG</label>
+                    <div class="preview-wrap" id="preview-wrap" hidden>
+                        <img class="preview-image" id="image-preview" alt="Selected image preview">
                     </div>
-
-
-                    <div class="confidence" id="cameraConfidence">
-
-                        Confidence: --
-
-                    </div>
-
-                </div>
-
-
-                <div class="error" id="cameraError" style="display:none;">
-
-                </div>
-
-            </div>
-
-
-
-            <!-- =================================================
-             IMAGE UPLOAD
-        ================================================== -->
-
-            <div class="box">
-
-                <h2>
-                    🖼 Upload Image
-                </h2>
-
-
-                <form action="/upload" method="POST" enctype="multipart/form-data">
-
-
-                    <input type="file" name="image" accept=".jpg,.jpeg,.png" required>
-
-
-                    <br>
-
-
-                    <button type="submit" class="detect">
-
-                    Detect Emotion
-
-                </button>
-
+                    <div class="controls"><button id="upload-button" type="submit" disabled>Analyze image</button></div>
                 </form>
-
-
-                {% if error %}
-
-                <div class="error">
-
-                    {{ error }}
-
-                </div>
-
-                {% endif %} {% if image %}
-
-                <img class="uploaded-image" src="{{ url_for('uploaded_file', filename=image) }}"> {% endif %} {% if emotion %}
-
-                <div class="result">
-
-                    <h3>
-                        Detected Emotion
-                    </h3>
-
-
-                    <div class="emotion">
-
-                        {{ emotion }}
-
-                    </div>
-
-
-                    <div class="confidence">
-
-                        Confidence: {{ confidence }}%
-
-                    </div>
-
-                </div>
-
-                {% endif %}
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-
+                <p class="status" id="upload-status" role="status" aria-live="polite">Images up to 8 MB are supported.</p>
+                <div class="error" id="upload-error" role="alert" hidden></div>
+                <section class="results" id="upload-results" aria-live="polite" hidden>
+                    <div class="result-heading"><strong id="upload-emotion"></strong><span id="upload-confidence"></span></div>
+                    <div id="upload-faces"></div>
+                </section>
+            </article>
+        </section>
+        <p class="disclaimer">For educational use only. Emotion categories are uncertain model estimates, not reliable measures of a person's internal emotional state.</p>
+    </main>
     <script>
-        // ======================================================
-        // VARIABLES
-        // ======================================================
+        const cameraUrl = {{ url_for('detect')|tojson }};
+        const uploadUrl = {{ url_for('upload')|tojson }};
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const startButton = document.getElementById("start-camera");
+        const stopButton = document.getElementById("stop-camera");
+        const detectButton = document.getElementById("detect-camera");
+        const cameraStatus = document.getElementById("camera-status");
+        const cameraError = document.getElementById("camera-error");
+        const uploadForm = document.getElementById("upload-form");
+        const imageFile = document.getElementById("image-file");
+        const imagePreview = document.getElementById("image-preview");
+        const previewWrap = document.getElementById("preview-wrap");
+        const uploadButton = document.getElementById("upload-button");
+        const uploadStatus = document.getElementById("upload-status");
+        const uploadError = document.getElementById("upload-error");
+        let cameraStream = null;
+        let previewUrl = null;
 
-        let video =
-            document.getElementById("video");
+        function setError(element, message) {
+            element.textContent = message;
+            element.hidden = !message;
+        }
 
-        let canvas =
-            document.getElementById("canvas");
+        function setBusy(button, busy, label) {
+            button.disabled = busy;
+            button.replaceChildren();
+            if (busy) {
+                const spinner = document.createElement("span");
+                spinner.className = "spinner";
+                spinner.setAttribute("aria-hidden", "true");
+                button.append(spinner, document.createTextNode(label));
+            } else {
+                button.textContent = label;
+            }
+        }
 
-        let cameraStatus =
-            document.getElementById("cameraStatus");
+        function renderResults(prefix, data) {
+            const results = document.getElementById(`${prefix}-results`);
+            const facesContainer = document.getElementById(`${prefix}-faces`);
+            document.getElementById(`${prefix}-emotion`).textContent = data.emotion;
+            document.getElementById(`${prefix}-confidence`).textContent =
+                `${Number(data.confidence).toFixed(1)}% confidence · ${data.face_count} face${data.face_count === 1 ? "" : "s"}`;
+            facesContainer.replaceChildren();
 
-        let cameraEmotion =
-            document.getElementById("cameraEmotion");
+            data.faces.forEach((face, index) => {
+                const card = document.createElement("div");
+                card.className = "face-card";
+                const heading = document.createElement("div");
+                heading.className = "face-heading";
+                const dominant = document.createElement("span");
+                dominant.textContent = `Face ${index + 1} · ${face.emotion}`;
+                const confidence = document.createElement("span");
+                confidence.textContent = `${Number(face.confidence).toFixed(1)}%`;
+                heading.append(dominant, confidence);
+                card.append(heading);
 
-        let cameraConfidence =
-            document.getElementById("cameraConfidence");
+                Object.entries(face.emotions).forEach(([emotion, score]) => {
+                    const row = document.createElement("div");
+                    row.className = "score-row";
+                    const name = document.createElement("span");
+                    name.textContent = emotion;
+                    const track = document.createElement("div");
+                    track.className = "score-track";
+                    const fill = document.createElement("div");
+                    fill.className = "score-fill";
+                    fill.style.width = `${Math.max(0, Math.min(100, Number(score)))}%`;
+                    track.append(fill);
+                    const value = document.createElement("span");
+                    value.className = "score-value";
+                    value.textContent = `${Number(score).toFixed(1)}%`;
+                    row.append(name, track, value);
+                    card.append(row);
+                });
+                facesContainer.append(card);
+            });
+            results.hidden = false;
+        }
 
-        let cameraError =
-            document.getElementById("cameraError");
-
-        let stream = null;
-
-
-        // ======================================================
-        // START CAMERA
-        // ======================================================
+        async function sendImage(url, formData) {
+            const response = await fetch(url, { method: "POST", body: formData });
+            let data;
+            try {
+                data = await response.json();
+            } catch (_error) {
+                throw new Error("The server returned an invalid response.");
+            }
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Image analysis failed.");
+            }
+            return data;
+        }
 
         async function startCamera() {
-
-            try {
-
-                cameraStatus.innerText =
-                    "Starting camera...";
-
-                cameraError.style.display =
-                    "none";
-
-
-                stream =
-                    await navigator.mediaDevices.getUserMedia({
-
-                        video: {
-
-                            width: 640,
-
-                            height: 480
-
-                        },
-
-                        audio: false
-
-                    });
-
-
-                video.srcObject =
-                    stream;
-
-
-                cameraStatus.innerText =
-                    "Camera is running. Click Detect Emotion.";
-
-
-            } catch (error) {
-
-                console.error(
-                    "Camera error:",
-                    error
-                );
-
-
-                cameraStatus.innerText =
-                    "Camera error: " +
-                    error.message;
-
+            setError(cameraError, "");
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setError(cameraError, "Camera access requires a supported browser and a secure context (localhost or HTTPS).");
+                return;
             }
-
+            startButton.disabled = true;
+            cameraStatus.textContent = "Requesting camera permission…";
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: false
+                });
+                video.srcObject = cameraStream;
+                await video.play();
+                stopButton.disabled = false;
+                detectButton.disabled = false;
+                cameraStatus.textContent = "Camera is ready. Capture a snapshot when you are ready.";
+            } catch (error) {
+                const messages = {
+                    NotAllowedError: "Camera permission was denied. Allow camera access in your browser settings and try again.",
+                    NotFoundError: "No camera was found on this device.",
+                    NotReadableError: "The camera is already in use by another application."
+                };
+                setError(cameraError, messages[error.name] || `Could not start the camera: ${error.message}`);
+                cameraStatus.textContent = "Camera could not be started.";
+            } finally {
+                startButton.disabled = Boolean(cameraStream);
+            }
         }
-
-
-        // ======================================================
-        // STOP CAMERA
-        // ======================================================
 
         function stopCamera() {
-
-            if (stream) {
-
-                let tracks =
-                    stream.getTracks();
-
-
-                tracks.forEach(
-                    function(track) {
-
-                        track.stop();
-
-                    }
-                );
-
-
-                stream = null;
-
-                video.srcObject = null;
-
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
             }
-
-
-            cameraStatus.innerText =
-                "Camera stopped.";
-
+            video.srcObject = null;
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            detectButton.disabled = true;
+            cameraStatus.textContent = "Camera is stopped.";
         }
 
-
-        // ======================================================
-        // DETECT EMOTION
-        // ======================================================
-
-        async function detectEmotion() {
-
-
-            // --------------------------------------------------
-            // Check camera
-            // --------------------------------------------------
-
-            if (!stream) {
-
-                cameraStatus.innerText =
-                    "Please start the camera first.";
-
+        async function detectFromCamera() {
+            if (!cameraStream || !video.videoWidth) {
+                setError(cameraError, "Start the camera and wait for the preview before detecting.");
                 return;
-
             }
-
-
-            // --------------------------------------------------
-            // Clear previous error
-            // --------------------------------------------------
-
-            cameraError.style.display =
-                "none";
-
-            cameraError.innerText = "";
-
-
-            cameraStatus.innerText =
-                "Capturing camera frame...";
-
-
-            // --------------------------------------------------
-            // Check video dimensions
-            // --------------------------------------------------
-
-            if (
-                video.videoWidth === 0 ||
-                video.videoHeight === 0
-            ) {
-
-                cameraStatus.innerText =
-                    "Camera is not ready. Please wait.";
-
+            setError(cameraError, "");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.9));
+            if (!blob) {
+                setError(cameraError, "Could not capture a camera frame. Please try again.");
                 return;
-
             }
-
-
-            // --------------------------------------------------
-            // Set canvas size
-            // --------------------------------------------------
-
-            canvas.width =
-                video.videoWidth;
-
-            canvas.height =
-                video.videoHeight;
-
-
-            // --------------------------------------------------
-            // Draw camera frame
-            // --------------------------------------------------
-
-            let context =
-                canvas.getContext("2d");
-
-
-            context.drawImage(
-
-                video,
-
-                0,
-
-                0,
-
-                canvas.width,
-
-                canvas.height
-
-            );
-
-
-            cameraStatus.innerText =
-                "Preparing image...";
-
-
-            // --------------------------------------------------
-            // Convert image to JPEG
-            // --------------------------------------------------
-
-            canvas.toBlob(
-
-                async function(blob) {
-
-
-                    if (!blob) {
-
-                        cameraStatus.innerText =
-                            "Could not capture image.";
-
-                        return;
-
-                    }
-
-
-                    // ------------------------------------------------
-                    // Create form data
-                    // ------------------------------------------------
-
-                    let formData =
-                        new FormData();
-
-
-                    formData.append(
-
-                        "frame",
-
-                        blob,
-
-                        "camera.jpg"
-
-                    );
-
-
-                    cameraStatus.innerText =
-                        "Analyzing emotion...";
-
-
-                    // ------------------------------------------------
-                    // Send to Flask
-                    // ------------------------------------------------
-
-                    try {
-
-                        let response =
-                            await fetch(
-
-                                "/camera_detect",
-
-                                {
-
-                                    method: "POST",
-
-                                    body: formData
-
-                                }
-
-                            );
-
-
-                        // --------------------------------------------
-                        // Read response
-                        // --------------------------------------------
-
-                        let data;
-
-
-                        try {
-
-                            data =
-                                await response.json();
-
-                        } catch (jsonError) {
-
-                            data = {
-
-                                error: "Server returned an invalid response."
-
-                            };
-
-                        }
-
-
-                        console.log(
-                            "HTTP status:",
-                            response.status
-                        );
-
-
-                        console.log(
-                            "Server response:",
-                            data
-                        );
-
-
-                        // ============================================
-                        // SUCCESS
-                        // ============================================
-
-                        if (
-                            response.ok &&
-                            data.success &&
-                            data.emotion
-                        ) {
-
-
-                            cameraEmotion.innerText =
-                                data.emotion;
-
-
-                            cameraConfidence.innerText =
-                                "Confidence: " +
-                                data.confidence +
-                                "%";
-
-
-                            cameraStatus.innerText =
-                                "Emotion detected successfully.";
-
-
-                            cameraError.style.display =
-                                "none";
-
-
-                        }
-
-
-                        // ============================================
-                        // ERROR FROM PYTHON
-                        // ============================================
-                        else {
-
-
-                            cameraEmotion.innerText =
-                                "--";
-
-
-                            cameraConfidence.innerText =
-                                "Confidence: --";
-
-
-                            let errorMessage =
-                                data.error ||
-                                "Unknown detection error.";
-
-
-                            cameraStatus.innerText =
-                                "Detection failed.";
-
-
-                            cameraError.innerText =
-                                "Python error: " +
-                                errorMessage;
-
-
-                            cameraError.style.display =
-                                "block";
-
-
-                            console.error(
-                                "Python error:",
-                                errorMessage
-                            );
-
-                        }
-
-
-                    } catch (error) {
-
-
-                        console.error(
-                            "Fetch error:",
-                            error
-                        );
-
-
-                        cameraStatus.innerText =
-                            "Could not connect to Flask.";
-
-
-                        cameraError.innerText =
-                            "Connection error: " +
-                            error.message;
-
-
-                        cameraError.style.display =
-                            "block";
-
-                    }
-
-                },
-
-
-                "image/jpeg",
-
-                0.85
-
-            );
-
+            const formData = new FormData();
+            formData.append("frame", blob, "camera.jpg");
+            setBusy(detectButton, true, "Analyzing…");
+            cameraStatus.textContent = "Analyzing the captured image…";
+            document.getElementById("camera-results").hidden = true;
+            try {
+                const data = await sendImage(cameraUrl, formData);
+                renderResults("camera", data);
+                cameraStatus.textContent = "Analysis complete.";
+            } catch (error) {
+                setError(cameraError, error.message);
+                cameraStatus.textContent = "Analysis could not be completed.";
+            } finally {
+                setBusy(detectButton, false, "Detect expression");
+                detectButton.disabled = !cameraStream;
+            }
         }
+
+        imageFile.addEventListener("change", () => {
+            setError(uploadError, "");
+            document.getElementById("upload-results").hidden = true;
+            const file = imageFile.files[0];
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = null;
+            if (!file) {
+                previewWrap.hidden = true;
+                uploadButton.disabled = true;
+                return;
+            }
+            if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 8 * 1024 * 1024) {
+                imageFile.value = "";
+                previewWrap.hidden = true;
+                uploadButton.disabled = true;
+                setError(uploadError, file.size > 8 * 1024 * 1024
+                    ? "The image exceeds the 8 MB upload limit."
+                    : "Choose a valid JPG or PNG image.");
+                return;
+            }
+            previewUrl = URL.createObjectURL(file);
+            imagePreview.src = previewUrl;
+            previewWrap.hidden = false;
+            uploadButton.disabled = false;
+            uploadStatus.textContent = `${file.name} · ${(file.size / 1024).toFixed(0)} KB`;
+        });
+
+        uploadForm.addEventListener("submit", async event => {
+            event.preventDefault();
+            if (!imageFile.files.length) return;
+            setError(uploadError, "");
+            document.getElementById("upload-results").hidden = true;
+            setBusy(uploadButton, true, "Analyzing…");
+            uploadStatus.textContent = "Uploading and analyzing image…";
+            try {
+                const data = await sendImage(uploadUrl, new FormData(uploadForm));
+                renderResults("upload", data);
+                uploadStatus.textContent = "Analysis complete.";
+            } catch (error) {
+                setError(uploadError, error.message);
+                uploadStatus.textContent = "Analysis could not be completed.";
+            } finally {
+                setBusy(uploadButton, false, "Analyze image");
+                uploadButton.disabled = !imageFile.files.length;
+            }
+        });
+
+        startButton.addEventListener("click", startCamera);
+        stopButton.addEventListener("click", stopCamera);
+        detectButton.addEventListener("click", detectFromCamera);
+        window.addEventListener("beforeunload", () => {
+            if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+        });
     </script>
-
-
 </body>
-
 </html>
