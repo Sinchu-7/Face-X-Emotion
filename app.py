@@ -1,440 +1,318 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-from deepface import DeepFace
-import cv2
-import os
 import base64
+import binascii
+import logging
+import os
+import secrets
+from functools import lru_cache
+from io import BytesIO
+from pathlib import Path
+
+import cv2
 import numpy as np
+from dotenv import load_dotenv
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from PIL import Image, UnidentifiedImageError
+from werkzeug.exceptions import RequestEntityTooLarge
+
+
+BASE_DIR = Path(__file__).resolve().parent
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png"}
+EMOTION_LABELS = (
+    "angry",
+    "disgust",
+    "fear",
+    "happy",
+    "sad",
+    "surprise",
+    "neutral",
+)
+MAX_IMAGE_DIMENSION = 6000
+MAX_IMAGE_PIXELS = 25_000_000
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+
+load_dotenv(BASE_DIR / ".env")
 
 app = Flask(__name__)
+app.config.update(
+    SECRET_KEY=os.environ.get("FLASK_SECRET_KEY") or secrets.token_urlsafe(32),
+    MAX_CONTENT_LENGTH=MAX_UPLOAD_BYTES,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "").lower()
+    in {"1", "true", "yes"},
+    PERMANENT_SESSION_LIFETIME=60 * 60 * 8,
+    APP_USERNAME=os.environ.get("APP_USERNAME", ""),
+    APP_PASSWORD=os.environ.get("APP_PASSWORD", ""),
+)
 
-app.secret_key = "facial_emotion_secret_key"
+logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO").upper())
+logger = logging.getLogger(__name__)
 
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
-# ============================================================
-# CONVERT NUMPY VALUES
-# ============================================================
-
-def convert_numpy(obj):
-
-    if isinstance(obj, dict):
-        return {
-            str(key): convert_numpy(value)
-            for key, value in obj.items()
-        }
-
-    if isinstance(obj, list):
-        return [convert_numpy(value) for value in obj]
-
-    if isinstance(obj, tuple):
-        return [convert_numpy(value) for value in obj]
-
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-
-    if isinstance(obj, np.generic):
-        return obj.item()
-
-    return obj
+if not os.environ.get("FLASK_SECRET_KEY"):
+    logger.warning("FLASK_SECRET_KEY is not set; sessions will reset when the app restarts.")
 
 
-# ============================================================
-# LOGIN PAGE
-# ============================================================
+@lru_cache(maxsize=1)
+def _get_deepface():
+    from deepface import DeepFace
 
-@app.route("/")
+    return DeepFace
+
+
+def _json_error(message, status):
+    return jsonify({"success": False, "error": message}), status
+
+
+def _decode_image(image_bytes):
+    if not image_bytes:
+        raise ValueError("The uploaded image is empty.")
+    if len(image_bytes) > MAX_UPLOAD_BYTES:
+        raise RequestEntityTooLarge()
+
+    try:
+        with Image.open(BytesIO(image_bytes)) as image_file:
+            if image_file.format not in {"JPEG", "PNG"}:
+                raise ValueError("Only JPEG and PNG images are supported.")
+            width, height = image_file.size
+            if (
+                width <= 0
+                or height <= 0
+                or width > MAX_IMAGE_DIMENSION
+                or height > MAX_IMAGE_DIMENSION
+                or width * height > MAX_IMAGE_PIXELS
+            ):
+                raise ValueError("The image dimensions are too large.")
+            image_file.verify()
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as error:
+        raise ValueError("The uploaded file is not a valid image.") from error
+
+    image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError("The uploaded file is not a valid image.")
+    return image
+
+
+def _read_uploaded_image(file_storage, check_extension=False):
+    if file_storage is None or not file_storage.filename:
+        raise ValueError("Choose an image to upload.")
+    if check_extension:
+        extension = Path(file_storage.filename).suffix.lower().lstrip(".")
+        if extension not in ALLOWED_EXTENSIONS:
+            raise ValueError("Only JPG, JPEG, and PNG files are supported.")
+    return _decode_image(file_storage.read())
+
+
+def _read_image_from_request():
+    if request.files:
+        uploaded_file = request.files.get("image") or request.files.get("file")
+        if uploaded_file is None:
+            uploaded_file = next(iter(request.files.values()), None)
+        return _read_uploaded_image(uploaded_file)
+
+    image_data = None
+    if request.is_json:
+        payload = request.get_json(silent=True)
+        if isinstance(payload, dict):
+            image_data = (
+                payload.get("image")
+                or payload.get("imageData")
+                or payload.get("image_data")
+                or payload.get("frame")
+            )
+    if image_data is None:
+        image_data = (
+            request.form.get("image")
+            or request.form.get("imageData")
+            or request.form.get("image_data")
+            or request.form.get("frame")
+        )
+    if not isinstance(image_data, str) or not image_data.strip():
+        raise ValueError("No image data received.")
+
+    if image_data.startswith("data:"):
+        header, separator, image_data = image_data.partition(",")
+        if not separator or header not in {
+            "data:image/jpeg;base64",
+            "data:image/png;base64",
+        }:
+            raise ValueError("Only JPEG and PNG images are supported.")
+    try:
+        image_bytes = base64.b64decode(image_data, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise ValueError("Invalid base64 image data.") from error
+    return _decode_image(image_bytes)
+
+
+def _face_result(face):
+    scores = face.get("emotion") or {}
+    normalized_scores = {
+        label: float(
+            next(
+                (
+                    value
+                    for key, value in scores.items()
+                    if str(key).lower() == label
+                ),
+                0.0,
+            )
+        )
+        for label in EMOTION_LABELS
+    }
+    dominant = str(face.get("dominant_emotion") or "Unknown").lower()
+    if dominant not in EMOTION_LABELS:
+        dominant = max(normalized_scores, key=normalized_scores.get)
+
+    return {
+        "emotion": dominant,
+        "confidence": normalized_scores[dominant],
+        "emotions": normalized_scores,
+        "region": face.get("region") or {},
+    }
+
+
+def _analyze_image(image):
+    result = _get_deepface().analyze(
+        img_path=image,
+        actions=["emotion"],
+        detector_backend="opencv",
+        enforce_detection=True,
+        silent=True,
+    )
+    raw_faces = result if isinstance(result, list) else [result]
+    faces = [_face_result(face) for face in raw_faces if isinstance(face, dict)]
+    if not faces:
+        raise ValueError("No face detected. Try an image with a clear, visible face.")
+
+    primary = faces[0]
+    return {
+        "success": True,
+        "emotion": primary["emotion"],
+        "confidence": primary["confidence"],
+        "emotions": primary["emotions"],
+        "face_count": len(faces),
+        "faces": faces,
+    }
+
+
+def _login_required():
+    return bool(session.get("logged_in"))
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_large_request(_error):
+    return _json_error("Image exceeds the 8 MB upload limit.", 413)
+
+
+@app.route("/", methods=["GET"])
 def index():
+    if _login_required():
+        return redirect(url_for("dashboard"))
     return render_template("login.html")
 
 
-# ============================================================
-# LOGIN
-# ============================================================
-
 @app.route("/login", methods=["POST"])
 def login():
-
     username = request.form.get("username", "")
     password = request.form.get("password", "")
+    configured_username = app.config["APP_USERNAME"]
+    configured_password = app.config["APP_PASSWORD"]
 
-    if username == "admin" and password == "1234":
+    if not configured_username or not configured_password:
+        return render_template(
+            "login.html",
+            error="Login is not configured. Set APP_USERNAME and APP_PASSWORD in .env.",
+        ), 503
 
+    if secrets.compare_digest(username, configured_username) and secrets.compare_digest(
+        password, configured_password
+    ):
+        session.clear()
+        session.permanent = True
         session["logged_in"] = True
+        return redirect(url_for("dashboard"))
 
-        return redirect(url_for("emotion"))
-
-    return render_template(
-        "login.html",
-        error="Invalid username or password"
-    )
+    return render_template("login.html", error="Invalid username or password."), 401
 
 
-# ============================================================
-# EMOTION PAGE
-# ============================================================
-
-@app.route("/emotion")
-def emotion():
-
-    if not session.get("logged_in"):
+@app.route("/dashboard", methods=["GET"])
+def dashboard():
+    if not _login_required():
         return redirect(url_for("index"))
+    return render_template("dashboard.html")
 
+
+@app.route("/emotion", methods=["GET"])
+def emotion():
+    if not _login_required():
+        return redirect(url_for("index"))
     return render_template("emotion.html")
 
 
-# ============================================================
-# LOGOUT
-# ============================================================
-
-@app.route("/logout")
+@app.route("/logout", methods=["POST"])
 def logout():
-
     session.clear()
-
     return redirect(url_for("index"))
 
 
-# ============================================================
-# EMOTION DETECTION
-#
-# Accept BOTH:
-#
-# /detect
-# /camera_detect
-#
-# ============================================================
+def _detect_response():
+    if not _login_required():
+        return _json_error("Authentication required.", 401)
+    try:
+        image = _read_image_from_request()
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    except RequestEntityTooLarge:
+        return _json_error("Image exceeds the 8 MB upload limit.", 413)
+
+    try:
+        return jsonify(_analyze_image(image))
+    except ValueError as error:
+        logger.info("Emotion analysis could not detect a face: %s", error)
+        return _json_error(
+            "No face detected. Try an image with a clear, visible face.", 422
+        )
+    except Exception:
+        logger.exception("Emotion analysis failed.")
+        return _json_error(
+            "Emotion analysis is temporarily unavailable. Please try again.", 503
+        )
+
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    if not _login_required():
+        return _json_error("Authentication required.", 401)
+    uploaded_file = request.files.get("image")
+    try:
+        image = _read_uploaded_image(uploaded_file, check_extension=True)
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    except RequestEntityTooLarge:
+        return _json_error("Image exceeds the 8 MB upload limit.", 413)
+
+    try:
+        return jsonify(_analyze_image(image))
+    except ValueError as error:
+        logger.info("Uploaded image did not contain a detectable face: %s", error)
+        return _json_error(
+            "No face detected. Try an image with a clear, visible face.", 422
+        )
+    except Exception:
+        logger.exception("Uploaded image analysis failed.")
+        return _json_error(
+            "Emotion analysis is temporarily unavailable. Please try again.", 503
+        )
+
 
 @app.route("/detect", methods=["POST"])
 @app.route("/camera_detect", methods=["POST"])
 def detect():
+    return _detect_response()
 
-    try:
-
-        print("\n======================================")
-        print("EMOTION DETECTION REQUEST")
-        print("======================================")
-
-        print("Content-Type:", request.content_type)
-
-        image_data = None
-
-        # ====================================================
-        # METHOD 1: JSON
-        # ====================================================
-
-        if request.is_json:
-
-            data = request.get_json(silent=True)
-
-            print("JSON received:", bool(data))
-
-            if data:
-
-                image_data = (
-                    data.get("image")
-                    or data.get("imageData")
-                    or data.get("image_data")
-                    or data.get("frame")
-                )
-
-
-        # ====================================================
-        # METHOD 2: FORM DATA
-        # ====================================================
-
-        if image_data is None:
-
-            image_data = (
-                request.form.get("image")
-                or request.form.get("imageData")
-                or request.form.get("image_data")
-                or request.form.get("frame")
-            )
-
-            if image_data:
-
-                print("Image received through form data")
-
-
-        # ====================================================
-        # METHOD 3: UPLOADED FILE
-        # ====================================================
-
-        if image_data is None and request.files:
-
-            print("Uploaded files:", list(request.files.keys()))
-
-            uploaded_file = None
-
-            if "image" in request.files:
-                uploaded_file = request.files["image"]
-
-            elif "file" in request.files:
-                uploaded_file = request.files["file"]
-
-            else:
-                uploaded_file = next(
-                    iter(request.files.values()),
-                    None
-                )
-
-            if uploaded_file:
-
-                image_bytes = uploaded_file.read()
-
-                np_array = np.frombuffer(
-                    image_bytes,
-                    np.uint8
-                )
-
-                image = cv2.imdecode(
-                    np_array,
-                    cv2.IMREAD_COLOR
-                )
-
-                if image is not None:
-
-                    print("Image received as uploaded file")
-
-                else:
-
-                    return jsonify({
-                        "success": False,
-                        "error": "Uploaded file is not a valid image"
-                    }), 400
-
-
-        # ====================================================
-        # NO IMAGE FOUND
-        # ====================================================
-
-        if image_data is None and "image" not in locals():
-
-            print("ERROR: No image data received")
-
-            return jsonify({
-                "success": False,
-                "error": "No image data received"
-            }), 400
-
-
-        # ====================================================
-        # DECODE BASE64 IMAGE
-        # ====================================================
-
-        if image_data is not None:
-
-            print("Image data received")
-
-            # Make sure it is a string
-            if isinstance(image_data, bytes):
-                image_data = image_data.decode("utf-8")
-
-            image_data = str(image_data)
-
-            # Remove data:image/jpeg;base64,...
-            if "," in image_data:
-
-                image_data = image_data.split(",", 1)[1]
-
-            try:
-
-                image_bytes = base64.b64decode(
-                    image_data
-                )
-
-            except Exception as e:
-
-                print("Base64 decode error:", e)
-
-                return jsonify({
-                    "success": False,
-                    "error": "Invalid base64 image"
-                }), 400
-
-
-            np_array = np.frombuffer(
-                image_bytes,
-                np.uint8
-            )
-
-            image = cv2.imdecode(
-                np_array,
-                cv2.IMREAD_COLOR
-            )
-
-
-        # ====================================================
-        # CHECK IMAGE
-        # ====================================================
-
-        if image is None:
-
-            print("ERROR: Image could not be decoded")
-
-            return jsonify({
-                "success": False,
-                "error": "Could not decode camera image"
-            }), 400
-
-
-        print("Image successfully decoded")
-        print("Image shape:", image.shape)
-
-
-        # ====================================================
-        # SAVE IMAGE
-        # ====================================================
-
-        image_path = os.path.join(
-            UPLOAD_FOLDER,
-            "captured_image.jpg"
-        )
-
-        cv2.imwrite(
-            image_path,
-            image
-        )
-
-        print("Image saved:", image_path)
-
-
-        # ====================================================
-        # RUN DEEPFACE
-        # ====================================================
-
-        print("Running DeepFace...")
-
-        result = DeepFace.analyze(
-            img_path=image_path,
-            actions=["emotion"],
-            enforce_detection=False
-        )
-
-        print("DeepFace finished")
-
-
-        # ====================================================
-        # HANDLE LIST RESULT
-        # ====================================================
-
-        if isinstance(result, list):
-
-            if len(result) == 0:
-
-                return jsonify({
-                    "success": False,
-                    "error": "No face detected"
-                }), 400
-
-            result = result[0]
-
-
-        # ====================================================
-        # GET EMOTIONS
-        # ====================================================
-
-        emotions = result.get(
-            "emotion",
-            {}
-        )
-
-
-        # ====================================================
-        # GET DOMINANT EMOTION
-        # ====================================================
-
-        dominant_emotion = result.get(
-            "dominant_emotion",
-            "Unknown"
-        )
-
-
-        # ====================================================
-        # GET CONFIDENCE
-        # ====================================================
-
-        confidence = emotions.get(
-            dominant_emotion,
-            0
-        )
-
-        confidence = float(confidence)
-
-
-        # ====================================================
-        # CONVERT NUMPY TYPES
-        # ====================================================
-
-        emotions = convert_numpy(emotions)
-        result = convert_numpy(result)
-
-
-        # ====================================================
-        # PRINT RESULT
-        # ====================================================
-
-        print("")
-        print("RESULT")
-        print("--------------------------------------")
-        print("Emotion:", dominant_emotion)
-        print("Confidence:", confidence)
-        print("--------------------------------------")
-
-
-        # ====================================================
-        # RETURN RESULT
-        # ====================================================
-
-        return jsonify({
-            "success": True,
-            "emotion": str(dominant_emotion),
-            "confidence": confidence,
-            "emotions": emotions,
-            "details": result
-        })
-
-
-    except Exception as e:
-
-        print("")
-        print("======================================")
-        print("DETECTION ERROR")
-        print("======================================")
-        print(str(e))
-        print("======================================")
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-
-# ============================================================
-# RUN SERVER
-# ============================================================
 
 if __name__ == "__main__":
-
-    print("")
-    print("======================================")
-    print(" FACIAL EMOTION RECOGNITION SYSTEM")
-    print("======================================")
-    print("")
-    print("Website:")
-    print("http://127.0.0.1:5000")
-    print("")
-    print("Demo Login:")
-    print("Username: admin")
-    print("Password: 1234")
-    print("")
-    print("======================================")
-    print("")
-
     app.run(
-        host="127.0.0.1",
-        port=5000,
-        debug=True
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", "5000")),
+        debug=os.environ.get("FLASK_DEBUG", "").lower() in {"1", "true", "yes"},
     )
