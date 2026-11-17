@@ -1,87 +1,85 @@
-# 😊 Face Emotion Analysis Using Deep Learning
+# Face-X-Emotion
 
-## 📌 Overview
-Face Emotion Analysis is a Deep Learning-based project that detects and classifies human facial emotions from images or real-time webcam input. It uses computer vision and a trained deep learning model to recognize facial expressions.
+Face-X-Emotion is an educational Flask application for estimating facial-expression categories from an uploaded image or a browser camera frame. It uses DeepFace for inference. These estimates are not reliable measurements of a person's internal emotional state and should not be used for consequential decisions.
 
-## 🎯 Features
-- Real-time facial emotion detection using webcam
-- Face detection and emotion classification
-- Image-based emotion analysis
-- Displays predicted emotion with confidence
-- User-friendly interface
+## Requirements
 
-## 🧠 Emotions Detected
-- Happy
-- Sad
-- Angry
-- Surprise
-- Fear
-- Disgust
-- Neutral
+- Windows, macOS, or Linux
+- 64-bit Python 3.11 (recommended; the pinned TensorFlow release is tested with Python 3.11)
+- A webcam for camera mode
+- An internet connection on the first inference run so DeepFace can download its pretrained detector and emotion model, if not already cached
 
-## 🛠️ Technologies Used
-- Python
-- Deep Learning
-- TensorFlow / Keras
-- OpenCV
-- NumPy
-- Matplotlib
+The application pins TensorFlow 2.16.2 (which supplies Keras 3), NumPy 1.26.4, OpenCV 4.10, DeepFace 0.0.93, Flask 3.1, and the supporting packages in `requirements.txt`. The inference path passes decoded OpenCV BGR images directly to DeepFace; it does not load the repository's locally trained CNN artifacts.
 
-## ⚙️ How It Works
-1. Captures facial images through a webcam or image upload.
-2. Detects the face using computer vision.
-3. Preprocesses the facial image.
-4. Passes the image to the trained deep learning model.
-5. Predicts and displays the detected emotion.
+## Windows PowerShell setup
 
-## 🚀 Installation and Setup
+From the repository folder:
 
-**1. Clone the repository**
-```bash
-git clone YOUR_REPOSITORY_URL
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+notepad .env
 ```
 
-**2. Navigate to the project folder**
-```bash
-cd Face-Emotion-Analysis
+In `.env`, replace the placeholder values for `FLASK_SECRET_KEY`, `APP_USERNAME`, and `APP_PASSWORD` with your own local secret and login credentials. Generate a secret with:
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-**3. Install dependencies**
-```bash
-pip install -r requirements.txt
+Save `.env` and run the application:
+
+```powershell
+python app.py
 ```
 
-**4. Run the application**
-```bash
-python main.py
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000). Sign in with the username and password you set in `.env`; there are no built-in demo credentials.
+
+To run the tests:
+
+```powershell
+python -m pytest
 ```
 
-## 📂 Project Structure
+For browser webcam access, use `http://127.0.0.1:5000` or HTTPS and grant camera permission. Camera inference is an on-demand snapshot, not continuous video analysis. Stop the camera in the page when finished.
+
+## Features
+
+- Environment-configured local login and session-protected dashboard
+- Browser webcam snapshot analysis with start/stop controls
+- JPEG/PNG image upload with preview and server-side validation
+- Seven emotion scores, dominant class, confidence, and per-face results
+- JSON API responses for upload and camera requests
+
+The app does not persist accounts or upload images and does not use a database. The login is a single local credential pair read from `.env`; it is not intended to provide multi-user production authentication. Flask's signed session cookie is HTTP-only and same-site. Set `SESSION_COOKIE_SECURE=true` when serving over HTTPS.
+
+## Model files and training
+
+- `model/emotion_model.keras` is the CNN artifact saved by `src/train.py`.
+- `model/fer.json` contains a serialized Keras model architecture and `model/fer.h5` is a separate legacy HDF5 model/weights artifact. The repository has no loader that verifies or pairs these two files.
+- The web and standalone camera inference use DeepFace's own pretrained emotion model. DeepFace caches its loaded models in-process and downloads model weights to its user cache on first use. The project artifacts above are preserved and are not silently substituted into that inference path.
+
+`src/train.py` expects the existing `dataset/train` and `dataset/test` folders. Run training from the repository root with:
+
+```powershell
+python src\train.py
+```
+
+Training may take a long time and will overwrite `model/emotion_model.keras`.
+
+## Project layout
+
 ```text
-Face-Emotion-Analysis/
-│
-├── dataset/
-├── models/
-├── src/
-├── main.py
-├── requirements.txt
-└── README.md
+app.py                  Flask application and JSON endpoints
+src\train.py            Local CNN training pipeline
+src\emotion_camera.py   Standalone OpenCV/DeepFace camera demo
+templates\              Flask/Jinja pages
+model\                  Preserved model artifacts
+dataset\train, test\    Seven-class image dataset
+tests\                  Flask application tests
+requirements.txt        Pinned Python dependencies
+.env.example            Safe local configuration template
 ```
-
-## 📊 Applications
-- Human-computer interaction
-- Emotion-aware applications
-- Educational research
-- Facial expression recognition
-
-## ⚠️ Disclaimer
-This project is developed for educational and research purposes. Emotion predictions are model estimates and should not be treated as reliable measures of a person's internal emotional state.
-
-## 👩‍💻 Author
-**Sinchana Poojary**
-
-GitHub: [@Sinchu-7](https://github.com/Sinchu-7)
-
----
-
-⭐ If you find this project interesting, consider giving it a star!
